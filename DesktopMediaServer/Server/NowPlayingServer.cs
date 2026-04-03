@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace DesktopMediaServer.Server
 {
-    public sealed class NowPlayingServer : IDisposable
+    public sealed class NowPlayingServer : IDisposable, IAsyncDisposable
     {
         private WebApplication? _app;
         public bool IsRunning => _app != null;
@@ -171,6 +171,25 @@ namespace DesktopMediaServer.Server
             _app = null;
         }
 
-        public void Dispose() => _ = StopAsync();
+        public void Dispose()
+        {
+            // Ensure the server is stopped synchronously when disposed from
+            // synchronous contexts (e.g. window closing). Use GetAwaiter to
+            // propagate exceptions to the caller instead of swallowing them.
+            try
+            {
+                StopAsync().GetAwaiter().GetResult();
+            }
+            catch
+            {
+                // Swallow here to avoid throwing from Dispose; callers can use
+                // DisposeAsync for async-aware disposal if they want errors.
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await StopAsync();
+        }
     }
 }
